@@ -1,7 +1,9 @@
 //jshint esversion:6
+require("dotenv").config();
 const { log } = require("console");
 const express = require("express");
 const mongoose = require("mongoose");
+const encrypt = require("mongoose-encryption");
 const app = express();
 mongoose.connect("mongodb://127.0.0.1:27017/usersDB", { useNewUrlParser: true });
 
@@ -10,8 +12,10 @@ const userSchema = new mongoose.Schema({
     password: String
 });
 
-const User = mongoose.model("User", userSchema);
 
+userSchema.plugin(encrypt, { secret: process.env.SECRET, encryptedFields: ["password"] });
+
+const User = mongoose.model("User", userSchema);
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -53,5 +57,5 @@ app.post("/login", async (req, res) => {
 
 })
 app.listen("3000", (req, res) => {
-    console.log("Serever running on 3000");
+    console.log("Server running on 3000");
 })
