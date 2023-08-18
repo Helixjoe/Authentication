@@ -25,7 +25,8 @@ mongoose.connect("mongodb://127.0.0.1:27017/usersDB", { useNewUrlParser: true })
 const userSchema = new mongoose.Schema({
     email: String,
     password: String,
-    googleId: String
+    googleId: String,
+    secret: String
 });
 
 userSchema.plugin(passportLocalMongoose);
@@ -37,7 +38,7 @@ passport.use(User.createStrategy());
 
 passport.serializeUser(function (user, cb) {
     process.nextTick(function () {
-        cb(null, { id: user.id, username: user.username, name: user.displayName });
+        cb(null, { id: user.id, username: user.username, name: user.displayName, secret: user.secret });
     });
 });
 
@@ -53,7 +54,6 @@ passport.use(new GoogleStrategy({
     callbackURL: "http://localhost:3000/auth/google/secrets"
 },
     function (accessToken, refreshToken, profile, cb) {
-        console.log(profile);
         User.findOrCreate({ googleId: profile.id }, function (err, user) {
             return cb(err, user);
         });
@@ -82,16 +82,32 @@ app.get("/logout", (req, res) => {
     });
 });
 
-app.get("/secrets", (req, res) => {
+app.get("/secrets", async (req, res) => {
+    const usersFound = await User.find();
+    res.render("secrets", { usersFoundList: usersFound });
+})
+
+app.get("/submit", (req, res) => {
     if (req.isAuthenticated()) {
-        res.render("secrets");
+        res.render("submit");
     }
     else {
         res.redirect("/login");
     }
 })
+
+app.post("/submit", async (req, res) => {
+    await User.findOneAndUpdate({ _id: req.user.id },
+        { $set: { secret: req.body.secret } }
+    )
+    res.redirect("/ secrets");
+})
+
+
+
+
 app.post("/register", (req, res) => {
-    User.register({ username: req.body.username }, req.body.password, function (err, user) {
+    User.register({ username: req.body.username, secret: null }, req.body.password, function (err, user) {
         if (err) {
             console.log(err);
             res.redirect("/register");
@@ -107,7 +123,7 @@ app.post("/register", (req, res) => {
 app.post("/login", async (req, res) => {
     const user = new User({
         username: req.body.username,
-        password: req.body.password
+        password: req.body.password,
     });
 
     req.login(user, function (err) {
